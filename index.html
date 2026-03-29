@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>WorkBase</title>
+  <style>
+    body {
+      font-family: Arial;
+      background: #0d0f14;
+      color: white;
+      padding: 20px;
+    }
+
+    input, textarea, button {
+      padding: 10px;
+      margin: 5px;
+      border-radius: 8px;
+      border: none;
+    }
+
+    input, textarea {
+      background: #1a1d25;
+      color: white;
+      width: 95%;
+    }
+
+    textarea { height: 100px; }
+
+    button {
+      background: #6366f1;
+      color: white;
+      cursor: pointer;
+    }
+
+    .client {
+      background: #161922;
+      padding: 12px;
+      margin-top: 10px;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+
+    #detailView { display: none; }
+
+    #dashboard {
+      margin-bottom: 15px;
+      padding: 10px;
+      background: #161922;
+      border-radius: 10px;
+    }
+
+    #userBox {
+      margin-bottom: 15px;
+      padding: 10px;
+      background: #161922;
+      border-radius: 10px;
+    }
+  </style>
+</head>
+
+<body>
+
+<h1>WorkBase</h1>
+
+<div id="userBox">
+  <strong>Your Info</strong><br>
+  <input id="userName" placeholder="Your name">
+  <input id="userEmail" placeholder="Your email">
+  <button onclick="saveUser()">Save Info</button>
+</div>
+
+<div id="dashboard"></div>
+
+<div id="mainView">
+  <input id="searchInput" placeholder="Search clients..." oninput="render()">
+
+  <input id="companyInput" placeholder="Company">
+  <input id="emailInput" placeholder="Client Email">
+  <input id="phoneInput" placeholder="Phone">
+  <input type="date" id="dateInput">
+  <input id="valueInput" placeholder="Job Value ($)">
+  <button onclick="addClient()">Add</button>
+
+  <div id="list"></div>
+</div>
+
+<div id="detailView">
+  <button onclick="goBack()">← Back</button>
+
+  <h2 id="dName"></h2>
+  <p id="dStatus"></p>
+  <p id="dFollow"></p>
+  <p id="dLast"></p>
+  <p id="dValue"></p>
+  <p id="dStage"></p>
+
+  <button onclick="callClient()">📞 Call</button>
+  <button onclick="emailClient()">✉️ Email</button>
+
+  <button onclick="logAction()">Log Action</button>
+  <button onclick="nextStatus()">Next Status</button>
+  <button onclick="setJobStage()">Set Job Stage</button>
+
+  <textarea id="notesInput"></textarea>
+  <button onclick="saveNotes()">Save Notes</button>
+
+  <button onclick="deleteClient()">Delete</button>
+</div>
+
+<script>
+let clients = [];
+let currentIndex = null;
+let user = JSON.parse(localStorage.getItem("user")) || {};
+
+try {
+  const stored = localStorage.getItem("clients");
+  clients = stored ? JSON.parse(stored) : [];
+} catch {
+  clients = [];
+}
+
+function save() {
+  localStorage.setItem("clients", JSON.stringify(clients));
+}
+
+function saveUser() {
+  user.name = userName.value;
+  user.email = userEmail.value;
+  localStorage.setItem("user", JSON.stringify(user));
+  alert("Saved");
+}
+
+function addClient() {
+  const name = companyInput.value.trim();
+  if (!name) return;
+
+  clients.push({
+    name,
+    email: emailInput.value,
+    phone: phoneInput.value,
+    followUp: dateInput.value,
+    status: "Lead",
+    lastAction: "None",
+    notes: "",
+    value: parseFloat(valueInput.value) || 0,
+    jobStage: "Quoted"
+  });
+
+  save();
+  render();
+
+  companyInput.value = "";
+  emailInput.value = "";
+  phoneInput.value = "";
+  dateInput.value = "";
+  valueInput.value = "";
+}
+
+function render() {
+  const list = document.getElementById("list");
+  const search = searchInput.value.toLowerCase();
+
+  list.innerHTML = "";
+
+  let pipeline = 0;
+  let won = 0;
+
+  clients.forEach((c, i) => {
+    if (c.jobStage === "Quoted") pipeline += c.value;
+    if (c.jobStage === "Won") won += c.value;
+
+    if (!c.name.toLowerCase().includes(search)) return;
+
+    const div = document.createElement("div");
+    div.className = "client";
+
+    div.innerHTML = `<strong>${c.name}</strong><br>$${c.value} • ${c.jobStage}`;
+    div.onclick = () => openDetail(i);
+
+    list.appendChild(div);
+  });
+
+  dashboard.innerHTML = `
+    <strong>Dashboard</strong><br>
+    Pipeline: $${pipeline}<br>
+    Won: $${won}<br>
+    Clients: ${clients.length}
+  `;
+}
+
+function openDetail(i) {
+  currentIndex = i;
+  const c = clients[i];
+  if (!c) return;
+
+  dName.innerText = c.name;
+  dStatus.innerText = "Status: " + c.status;
+  dFollow.innerText = "Follow-up: " + (c.followUp || "None");
+  dLast.innerText = "Last: " + c.lastAction;
+  dValue.innerText = "Job Value: $" + c.value;
+  dStage.innerText = "Stage: " + c.jobStage;
+  notesInput.value = c.notes || "";
+
+  mainView.style.display = "none";
+  detailView.style.display = "block";
+}
+
+function goBack() {
+  mainView.style.display = "block";
+  detailView.style.display = "none";
+  render();
+}
+
+function callClient() {
+  const phone = clients[currentIndex].phone;
+  if (!phone) return alert("No phone");
+  window.location.href = "tel:" + phone;
+}
+
+function emailClient() {
+  const c = clients[currentIndex];
+  const subject = encodeURIComponent("Following up");
+  const body = encodeURIComponent(
+    `Hey ${c.name},\n\nThis is ${user.name || "me"} just following up.\n\nLet me know!`
+  );
+  window.location.href = `mailto:${c.email}?subject=${subject}&body=${body}`;
+}
+
+function logAction() {
+  const action = prompt("What did you do?");
+  if (!action) return;
+
+  clients[currentIndex].lastAction = action;
+  save();
+  openDetail(currentIndex);
+}
+
+function nextStatus() {
+  let c = clients[currentIndex];
+
+  if (c.status === "Lead") c.status = "Active";
+  else if (c.status === "Active") c.status = "Done";
+  else c.status = "Lead";
+
+  save();
+  openDetail(currentIndex);
+}
+
+function setJobStage() {
+  const stage = prompt("Quoted / Won / Lost");
+  if (!stage) return;
+
+  clients[currentIndex].jobStage = stage;
+  save();
+  openDetail(currentIndex);
+}
+
+function saveNotes() {
+  clients[currentIndex].notes = notesInput.value;
+  save();
+  alert("Saved");
+}
+
+function deleteClient() {
+  if (!confirm("Delete?")) return;
+  clients.splice(currentIndex, 1);
+  save();
+  goBack();
+}
+
+render();
+</script>
+
+</body>
+</html>
