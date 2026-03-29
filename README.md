@@ -1,0 +1,1 @@
+This is an in progress, simple tool for small businesses to track clients. We are gathering information and feedback to improve it before public release while still in a pre-revenue phase. Please feel free to leave any comments about what may be confusing, what could be added, or if you'd actually use it (pay for it), as a small business owner.
